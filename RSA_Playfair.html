@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RSA & Playfair Cipher</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f0f4f8;
+    }
+    h1, h2 {
+      color: #333;
+    }
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    label, input, select, button, textarea {
+      display: block;
+      width: 100%;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+    input, select, textarea {
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    .output {
+      background: #f9f9f9;
+      padding: 10px;
+      border-radius: 5px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>RSA & Playfair Cipher Encryption</h1>
+  <label for="method">Select Method:</label>
+  <select id="method">
+    <option value="rsa">RSA</option>
+    <option value="playfair">Playfair Cipher</option>
+  </select>
+
+  <div id="rsaFields">
+    <label>Enter prime numbers p and q:</label>
+    <input type="number" id="p" placeholder="e.g., 11">
+    <input type="number" id="q" placeholder="e.g., 13">
+    <label>Enter numeric message:</label>
+    <input type="number" id="rsaMessage" placeholder="e.g., 7">
+  </div>
+
+  <div id="playfairFields" style="display:none;">
+    <label>Enter key:</label>
+    <input type="text" id="playfairKey" placeholder="e.g., Monarchy">
+    <label>Enter plaintext:</label>
+    <input type="text" id="playfairText" placeholder="e.g., instruments">
+  </div>
+
+  <button onclick="encrypt()">Encrypt</button>
+
+  <h2>Output:</h2>
+  <div class="output" id="output"></div>
+</div>
+
+<script>
+  document.getElementById("method").addEventListener("change", function () {
+    const rsaFields = document.getElementById("rsaFields");
+    const playfairFields = document.getElementById("playfairFields");
+    if (this.value === "rsa") {
+      rsaFields.style.display = "block";
+      playfairFields.style.display = "none";
+    } else {
+      rsaFields.style.display = "none";
+      playfairFields.style.display = "block";
+    }
+  });
+
+  function gcd(a, b) {
+    return b === 0 ? a : gcd(b, a % b);
+  }
+
+  function modpow(base, exponent, mod) {
+    let result = 1;
+    base = base % mod;
+    while (exponent > 0) {
+      if (exponent % 2 === 1) result = (result * base) % mod;
+      base = (base * base) % mod;
+      exponent = Math.floor(exponent / 2);
+    }
+    return result;
+  }
+
+  function findE(phiN) {
+    for (let e = 2; e < phiN; e++) {
+      if (gcd(e, phiN) === 1) return e;
+    }
+    return -1;
+  }
+
+  function findD(e, phiN) {
+    let d = 1;
+    while ((d * e) % phiN !== 1) d++;
+    return d;
+  }
+
+  function prepareText(str) {
+    str = str.toLowerCase().replace(/j/g, 'i').replace(/\s/g, '');
+    let result = "";
+    for (let i = 0; i < str.length; i += 2) {
+      let a = str[i];
+      let b = str[i + 1] || 'z';
+      if (a === b) {
+        result += a + 'x';
+        i--;
+      } else {
+        result += a + b;
+      }
+    }
+    return result;
+  }
+
+  function generateKeyTable(key) {
+    key = key.toLowerCase().replace(/j/g, 'i').replace(/[^a-z]/g, '');
+    let seen = new Set();
+    let table = "";
+    for (let ch of key) {
+      if (!seen.has(ch)) {
+        seen.add(ch);
+        table += ch;
+      }
+    }
+    for (let ch of 'abcdefghiklmnopqrstuvwxyz') {
+      if (!seen.has(ch)) table += ch;
+    }
+    return Array.from({ length: 5 }, (_, i) => table.slice(i * 5, i * 5 + 5).split(''));
+  }
+
+  function findPosition(char, table) {
+    for (let i = 0; i < 5; i++) {
+      for (let j = 0; j < 5; j++) {
+        if (table[i][j] === char) return [i, j];
+      }
+    }
+  }
+
+  function playfairEncrypt(text, key) {
+    const table = generateKeyTable(key);
+    text = prepareText(text);
+    let cipher = "";
+    for (let i = 0; i < text.length; i += 2) {
+      const [r1, c1] = findPosition(text[i], table);
+      const [r2, c2] = findPosition(text[i + 1], table);
+      if (r1 === r2) {
+        cipher += table[r1][(c1 + 1) % 5] + table[r2][(c2 + 1) % 5];
+      } else if (c1 === c2) {
+        cipher += table[(r1 + 1) % 5][c1] + table[(r2 + 1) % 5][c2];
+      } else {
+        cipher += table[r1][c2] + table[r2][c1];
+      }
+    }
+    return cipher;
+  }
+
+  function encrypt() {
+    const method = document.getElementById("method").value;
+    const output = document.getElementById("output");
+    output.textContent = "";
+
+    if (method === "rsa") {
+      const p = parseInt(document.getElementById("p").value);
+      const q = parseInt(document.getElementById("q").value);
+      const m = parseInt(document.getElementById("rsaMessage").value);
+
+      if (!p || !q || !m) return output.textContent = "Please fill all RSA fields.";
+
+      const n = p * q;
+      const phiN = (p - 1) * (q - 1);
+      const e = findE(phiN);
+      const d = findD(e, phiN);
+      const c = modpow(m, e, n);
+      const decrypted = modpow(c, d, n);
+
+      output.textContent = `Public key: {${e}, ${n}}\nPrivate key: {${d}, ${n}}\nOriginal: ${m}\nEncrypted: ${c}\nDecrypted: ${decrypted}`;
+    } else {
+      const key = document.getElementById("playfairKey").value;
+      const text = document.getElementById("playfairText").value;
+      if (!key || !text) return output.textContent = "Please fill key and text for Playfair cipher.";
+
+      const cipher = playfairEncrypt(text, key);
+      output.textContent = `Cipher text: ${cipher}`;
+    }
+  }
+</script>
+</body>
+</html>
